@@ -13,6 +13,7 @@ pinecone
 
 # Relational store (structured CRM data)
 supabase
+psycopg2-binary   # direct Postgres connection for migrations/seeding
 
 # Document ingestion
 pypdf

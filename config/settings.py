@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     # ---- Supabase ----
     supabase_url: str = ""
     supabase_key: str = ""
+    supabase_db_url: str = ""  # direct Postgres URI, used only for migrations/seeding
 
     # ---- Retrieval ----
     top_k: int = 5
