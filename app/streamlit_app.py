@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 
-from agent.core import build_agent
+from agent.core import build_agent, run_agent
 
 st.set_page_config(page_title="Sales Assistant", page_icon="💼", layout="centered")
 st.title("💼 Sales Knowledge & CRM Assistant")
@@ -49,16 +49,14 @@ if prompt := st.chat_input("Ask about policies, scripts, or live CRM data..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            result = get_agent().invoke({"input": prompt})
-        answer = result["output"]
+            answer, steps = run_agent(get_agent(), prompt)
         st.markdown(answer)
 
-        steps = result.get("intermediate_steps", [])
         if steps:
             with st.expander("🔍 Agent reasoning (tools used)"):
-                for action, observation in steps:
-                    st.markdown(f"**Tool:** `{action.tool}`")
-                    st.markdown(f"**Input:** `{action.tool_input}`")
-                    st.markdown(f"**Result:**\n\n{observation}")
+                for step in steps:
+                    st.markdown(f"**Tool:** `{step['tool']}`")
+                    st.markdown(f"**Input:** `{step['input']}`")
+                    st.markdown(f"**Result:**\n\n{step['output']}")
 
     st.session_state.messages.append({"role": "assistant", "content": answer})
