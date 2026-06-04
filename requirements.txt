@@ -1,0 +1,25 @@
+# Orchestration
+langchain
+langchain-core
+langchain-community
+
+# LLM providers (swap via LLM_PROVIDER in .env)
+langchain-openai
+langchain-anthropic
+
+# Vector store (unstructured knowledge base)
+langchain-pinecone
+pinecone
+
+# Relational store (structured CRM data)
+supabase
+
+# Document ingestion
+pypdf
+
+# UI
+streamlit
+
+# Config
+pydantic-settings
+python-dotenv
