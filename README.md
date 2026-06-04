@@ -68,6 +68,7 @@ Keys needed in `.env`: `ANTHROPIC_API_KEY` (chat), `OPENAI_API_KEY` (embeddings)
 ## Tests
 
 ```bash
+pip install -r requirements-dev.txt
 pytest                      # offline smoke tests
 RUN_INTEGRATION=1 pytest    # also hits live Supabase + Pinecone (must be seeded/ingested)
 ```
