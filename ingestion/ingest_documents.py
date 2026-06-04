@@ -68,12 +68,12 @@ def main() -> None:
     splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
     chunks = splitter.split_documents(docs)
 
-    PineconeVectorStore.from_documents(
-        chunks,
-        embedding=get_embeddings(),
+    store = PineconeVectorStore(
         index_name=settings.pinecone_index,
-        ids=build_ids(chunks),
+        embedding=get_embeddings(),
+        pinecone_api_key=settings.pinecone_api_key,
     )
+    store.add_documents(chunks, ids=build_ids(chunks))
     print(f"Upserted {len(chunks)} chunks from {len(docs)} document page(s).")
 
 

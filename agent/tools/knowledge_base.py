@@ -18,6 +18,7 @@ def _get_vectorstore() -> PineconeVectorStore:
         _vectorstore = PineconeVectorStore(
             index_name=settings.pinecone_index,
             embedding=get_embeddings(),
+            pinecone_api_key=settings.pinecone_api_key,
         )
     return _vectorstore
 
