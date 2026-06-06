@@ -13,9 +13,26 @@ import streamlit as st
 # Streamlit Cloud exposes secrets via st.secrets, not as environment variables.
 # config.settings (pydantic-settings) reads os.environ, so bridge them here BEFORE
 # importing the agent — otherwise every key defaults to "" and auth fails.
-for _key, _val in st.secrets.items():
+try:
+    _secret_items = list(st.secrets.items())
+except Exception:
+    _secret_items = []
+
+for _key, _val in _secret_items:
     if isinstance(_val, (str, int, float, bool)):
-        os.environ.setdefault(_key, str(_val))
+        os.environ[_key] = str(_val)  # overwrite, don't setdefault, so updates take effect
+
+# Fail fast with a readable message instead of a deep TypeError if keys are missing.
+_required = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "PINECONE_API_KEY", "SUPABASE_URL", "SUPABASE_KEY"]
+_missing = [k for k in _required if not os.environ.get(k)]
+if _missing:
+    st.error(
+        f"Missing required secrets: {', '.join(_missing)}.\n\n"
+        f"st.secrets currently has {len(_secret_items)} entr"
+        f"{'y' if len(_secret_items) == 1 else 'ies'}: {sorted(k for k, _ in _secret_items)}\n\n"
+        "Fix in Manage app → Settings → Secrets, then reboot the app."
+    )
+    st.stop()
 
 from agent.core import build_agent, run_agent
 
