@@ -10,6 +10,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import streamlit as st
 
+# Streamlit Cloud exposes secrets via st.secrets, not as environment variables.
+# config.settings (pydantic-settings) reads os.environ, so bridge them here BEFORE
+# importing the agent — otherwise every key defaults to "" and auth fails.
+for _key, _val in st.secrets.items():
+    if isinstance(_val, (str, int, float, bool)):
+        os.environ.setdefault(_key, str(_val))
+
 from agent.core import build_agent, run_agent
 
 st.set_page_config(page_title="Sales Assistant", page_icon="💼", layout="centered")
