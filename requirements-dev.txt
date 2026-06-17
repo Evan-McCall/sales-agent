@@ -1,0 +1,17 @@
+# Local development + data tooling. Install alongside the deploy deps:
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+# Run the API locally (Vercel provides the ASGI server in production)
+uvicorn
+
+# Legacy Streamlit UI (app/streamlit_app.py) — superseded by the React frontend
+streamlit
+
+# Document ingestion (ingestion/ingest_documents.py)
+pypdf
+
+# Direct Postgres connection for migrations/seeding (db/)
+psycopg2-binary
+
+# Tests
+pytest

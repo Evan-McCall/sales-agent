@@ -23,16 +23,35 @@ Instead of naive retrieval over everything, the LLM acts as a router. Semantic q
 git clone https://github.com/Evan-McCall/sales-agent.git
 cd sales-agent
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-dev.txt   # runtime + local tooling
 cp .env.example .env          # fill in your keys
 
 # paste db/schema.sql into the Supabase SQL editor, then:
 python -m db.seed
 python -m ingestion.ingest_documents
-streamlit run app/streamlit_app.py
+
+# 1) API (FastAPI, serves the agent over HTTP):
+uvicorn api.index:app --port 8099 --reload
+
+# 2) Web app (in a second terminal):
+cd frontend && npm install && npm run dev   # http://localhost:5173
 ```
 
-Open the app, type a question, and watch the agent pick a tool and answer.
+Open **http://localhost:5173**, type a question, and watch the agent pick a tool and stream the answer — with its reasoning shown. The Vite dev server proxies `/api` to the FastAPI server, so it behaves exactly like the Vercel deploy.
+
+> **Web stack:** the polished UI is a React + TypeScript app (`frontend/`, dark theme, "Stem") talking to a FastAPI endpoint (`api/index.py`) that wraps the agent and streams over SSE. The original **Streamlit** UI (`app/streamlit_app.py`) still works for quick local use — `streamlit run app/streamlit_app.py` — but is no longer the deploy target.
+
+---
+
+## 🚀 Deploy to Vercel
+
+The repo is a single Vercel project: the React app builds to static files and the agent runs as a Python serverless function (`api/index.py`), wired up by `vercel.json`.
+
+1. Push to GitHub and **Import** the repo in Vercel (or run `vercel`).
+2. In **Project → Settings → Environment Variables**, add the same keys as `.env`: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `PINECONE_API_KEY`, `PINECONE_INDEX`, `SUPABASE_URL`, `SUPABASE_KEY` (plus any model/region overrides).
+3. Deploy. Vercel builds `frontend/` and routes `/api/*` to the function.
+
+The function installs the slim `api/requirements.txt` (no Streamlit/ingestion/test deps) to stay under Vercel's size limit. Heavy LangChain deps mean the first request after idle can cold-start for a few seconds; it's warm thereafter.
 
 ---
 
@@ -57,7 +76,8 @@ Open the app, type a question, and watch the agent pick a tool and answer.
 - **Knowledge base** — PDFs and text chunked, embedded, and searched via Pinecone
 - **Live CRM tools** — `get_lead_status`, `get_deal_size`, `get_leads_by_rep` over Supabase (Postgres)
 - **Safe by design** — predefined CRM functions, not LLM-generated SQL; no write access exposed
-- **Transparent reasoning** — the Streamlit UI shows which tool ran and with what input
+- **Transparent reasoning** — the UI shows which engine ran (knowledge base vs CRM), with what input, and what it returned
+- **Polished web app** — a React + TypeScript frontend (dark, prompt-first) that streams answers token-by-token over SSE, deployable to Vercel
 - **Model-swappable** — Claude Sonnet 4.6 by default, OpenAI via a one-line `.env` change
 - **Idempotent ingestion** — deterministic chunk IDs so re-runs overwrite instead of duplicate
 - **Seeded demo data** — 10 accounts, 10 leads, 8 opportunities, and 3 sample docs out of the box
@@ -75,8 +95,9 @@ A question flows through four stages:
 
 ```mermaid
 flowchart TD
-    User([Sales Rep]) --> UI[Streamlit Chat UI]
-    UI --> Agent[Tool-Calling Agent<br/>Claude Sonnet 4.6]
+    User([Sales Rep]) --> UI[React Web App<br/>Vercel]
+    UI <--> API[FastAPI · SSE stream<br/>api/index.py]
+    API --> Agent[Tool-Calling Agent<br/>Claude Sonnet 4.6]
     Agent --> Router{Which tool?}
     Router -->|policies / scripts / docs| KB[search_knowledge_base]
     Router -->|leads / deals / owners| CRM[CRM tools]
@@ -84,7 +105,7 @@ flowchart TD
     CRM --> Supabase[(Supabase)]
     Pinecone --> Agent
     Supabase --> Agent
-    Agent --> UI
+    Agent --> API
 ```
 
 > **On embeddings:** Anthropic has no embeddings endpoint, so the knowledge-base half uses **OpenAI `text-embedding-3-small`** for both ingestion and query embeddings. You therefore need an OpenAI key for embeddings even when running Claude as the chat model. The CRM half uses no embeddings.
@@ -122,7 +143,9 @@ cp .env.example .env             # then fill in your keys
 | `pinecone`          | Vector database for the knowledge base           |
 | `supabase`          | CRM data store (Postgres)                         |
 | `pypdf`             | PDF loading for ingestion                        |
-| `streamlit`         | Chat UI                                          |
+| `fastapi`           | HTTP API that streams the agent (SSE)            |
+| React + Vite + Tailwind | Web frontend (`frontend/`), deployed on Vercel |
+| `streamlit`         | Legacy local chat UI (dev only)                  |
 
 ---
 
@@ -158,13 +181,16 @@ RUN_INTEGRATION=1 pytest    # also hits live Supabase + Pinecone (must be seeded
 config/      settings (pydantic, reads .env)
 agent/
 ├── llm.py            # chat + embedding factories (Claude Sonnet 4.6 default)
-├── core.py           # tool-calling agent assembly
+├── core.py           # tool-calling agent assembly + stream_agent() generator
 └── tools/
     ├── knowledge_base.py   # Tool 1: Pinecone semantic search
     └── crm.py              # Tool 2: Supabase CRM functions
+api/         index.py — FastAPI app: /api/health + /api/chat (SSE); requirements.txt (slim deploy deps)
+frontend/    React + TS + Tailwind web app (Vite). src/components/, the SSE client in src/lib/api.ts
+vercel.json  one project: builds frontend/ → static, routes /api/* to the Python function
 ingestion/   ingest_documents.py — PDF/TXT → chunk → embed → Pinecone
 db/          schema.sql + seed.py (stubbed CRM data)
-app/         streamlit_app.py (chat UI with tool-trace expander)
+app/         streamlit_app.py (legacy local chat UI)
 data/documents/  sample policy/script/pricing docs (PDF; .txt also supported)
 tests/       offline smoke tests + opt-in integration tests
 ```
@@ -193,7 +219,9 @@ Ideas worth exploring (no promises, no timelines):
 
 - [ ] Automated ingestion (Airbyte / connectors) beyond a local folder
 - [ ] Real Salesforce / HubSpot integration in place of stubbed Supabase data
-- [ ] Conversation memory across turns
+- [x] Conversation memory across turns (in-session; the web app sends full history)
+- [ ] Persistent, cross-session conversation history (currently in-memory only)
+- [ ] Authentication for the web app (currently open behind the URL)
 - [ ] Optional Text-to-SQL tool for ad-hoc CRM analytics
 - [ ] Source-citation links back to the original document
 - [ ] Eval harness for routing accuracy

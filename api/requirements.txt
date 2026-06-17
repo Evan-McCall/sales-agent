@@ -1,0 +1,24 @@
+# Deploy deps for the Vercel Python function (api/index.py).
+# Deliberately slim — no streamlit / pypdf / psycopg2 / pytest — to stay well under
+# Vercel's 250 MB unzipped function limit. Local dev/seed tools live in requirements-dev.txt.
+
+fastapi
+
+# Agent orchestration
+langchain
+langchain-core
+langgraph
+
+# LLM providers (swap via LLM_PROVIDER)
+langchain-anthropic
+langchain-openai
+
+# Vector store (knowledge base)
+langchain-pinecone
+pinecone
+
+# CRM store
+supabase
+
+# Config
+pydantic-settings

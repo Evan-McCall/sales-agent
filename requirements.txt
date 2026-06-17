@@ -1,6 +1,15 @@
+# Runtime deps for the agent + API. Kept slim so the Vercel Python function stays
+# under the 250 MB unzipped limit. For local UIs and data tooling (Streamlit, ingestion,
+# seeding, tests) also install requirements-dev.txt:
+#   pip install -r requirements.txt -r requirements-dev.txt
+
+# API
+fastapi
+
 # Orchestration
 langchain
 langchain-core
+langgraph
 langchain-community
 
 # LLM providers (swap via LLM_PROVIDER in .env)
@@ -13,17 +22,7 @@ pinecone
 
 # Relational store (structured CRM data)
 supabase
-psycopg2-binary   # direct Postgres connection for migrations/seeding
-
-# Document ingestion
-pypdf
-
-# UI
-streamlit
 
 # Config
 pydantic-settings
 python-dotenv
-
-# Testing
-pytest

@@ -72,3 +72,40 @@ def run_agent(agent, query: str, chat_history=None):
 
     answer = _text(msgs[-1].content)
     return answer, steps
+
+
+def stream_agent(agent, messages):
+    """Stream the agent's work as a sequence of typed events.
+
+    Yields dicts the transport layer can serialize as-is:
+    - {"type": "tool", "tool", "input"}   — the model decided to call a tool
+    - {"type": "tool_result", "tool", "output"} — that tool returned
+    - {"type": "token", "text"}           — a chunk of the final answer
+    - {"type": "done"}                    — the run finished
+
+    `messages` is the full conversation so far ([{role, content}, ...]); the agent
+    is stateless, so the caller owns history. Order is causal: events are emitted
+    in the order LangGraph produces them.
+    """
+    for mode, chunk in agent.stream({"messages": messages}, stream_mode=["updates", "messages"]):
+        if mode == "messages":
+            # (message_chunk, metadata). Only the model node's text is answer output;
+            # tool calls and tool results arrive (more usefully) via "updates" below.
+            msg, meta = chunk
+            if meta.get("langgraph_node") != "model":
+                continue
+            text = _text(msg.content)
+            if text:
+                yield {"type": "token", "text": text}
+        else:  # "updates": {node_name: {"messages": [...]}}
+            for node, update in chunk.items():
+                for m in (update or {}).get("messages", []) if isinstance(update, dict) else []:
+                    for call in getattr(m, "tool_calls", None) or []:
+                        yield {"type": "tool", "tool": call["name"], "input": call["args"]}
+                    if isinstance(m, ToolMessage):
+                        yield {
+                            "type": "tool_result",
+                            "tool": getattr(m, "name", None),
+                            "output": _text(m.content),
+                        }
+    yield {"type": "done"}
