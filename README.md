@@ -33,25 +33,25 @@ python -m ingestion.ingest_documents
 # 1) API (FastAPI, serves the agent over HTTP):
 uvicorn api.index:app --port 8099 --reload
 
-# 2) Web app (in a second terminal):
-cd frontend && npm install && npm run dev   # http://localhost:5173
+# 2) Web app (in a second terminal, from the repo root):
+npm install && npm run dev   # http://localhost:5173
 ```
 
 Open **http://localhost:5173**, type a question, and watch the agent pick a tool and stream the answer — with its reasoning shown. The Vite dev server proxies `/api` to the FastAPI server, so it behaves exactly like the Vercel deploy.
 
-> **Web stack:** the polished UI is a React + TypeScript app (`frontend/`, dark theme, "Stem") talking to a FastAPI endpoint (`api/index.py`) that wraps the agent and streams over SSE. The original **Streamlit** UI (`app/streamlit_app.py`) still works for quick local use — `streamlit run app/streamlit_app.py` — but is no longer the deploy target.
+> **Web stack:** the polished UI is a React + TypeScript app (Vite, at the repo root, dark theme, "Stem") talking to a FastAPI endpoint (`api/index.py`) that wraps the agent and streams over SSE. The original **Streamlit** UI (`app/streamlit_app.py`) still works for quick local use — `streamlit run app/streamlit_app.py` — but is no longer the deploy target.
 
 ---
 
 ## 🚀 Deploy to Vercel
 
-The repo is a single Vercel project: the React app builds to static files and the agent runs as a Python serverless function (`api/index.py`), wired up by `vercel.json`.
+The repo is a single Vercel project: Vercel auto-detects the **Vite** app at the root and builds it to static files, and runs the agent as a Python serverless function (`api/index.py`). `vercel.json` sets the framework, the function `maxDuration`, and the `/api/*` rewrite.
 
-1. Push to GitHub and **Import** the repo in Vercel (or run `vercel`).
+1. Push to GitHub and **Import** the repo in Vercel (or run `vercel`). Keep the Root Directory at the repo root.
 2. In **Project → Settings → Environment Variables**, add the same keys as `.env`: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `PINECONE_API_KEY`, `PINECONE_INDEX`, `SUPABASE_URL`, `SUPABASE_KEY` (plus any model/region overrides).
-3. Deploy. Vercel builds `frontend/` and routes `/api/*` to the function.
+3. Deploy. Vercel builds the static SPA and routes `/api/*` to the function.
 
-The function installs the slim `api/requirements.txt` (no Streamlit/ingestion/test deps) to stay under Vercel's size limit. Heavy LangChain deps mean the first request after idle can cold-start for a few seconds; it's warm thereafter.
+The function installs `api/requirements.txt` (slim — no Streamlit/ingestion/test deps) to stay under Vercel's size limit. Heavy LangChain deps mean the first request after idle can cold-start for a few seconds; it's warm thereafter.
 
 ---
 
@@ -186,8 +186,9 @@ agent/
     ├── knowledge_base.py   # Tool 1: Pinecone semantic search
     └── crm.py              # Tool 2: Supabase CRM functions
 api/         index.py — FastAPI app: /api/health + /api/chat (SSE); requirements.txt (slim deploy deps)
-frontend/    React + TS + Tailwind web app (Vite). src/components/, the SSE client in src/lib/api.ts
-vercel.json  one project: builds frontend/ → static, routes /api/* to the Python function
+src/         React + TS + Tailwind web app (Vite, at repo root). components/, SSE client in lib/api.ts
+index.html, vite.config.ts, package.json, public/   the Vite app's root files
+vercel.json  one project: Vite static build + /api Python function, with the /api/* rewrite
 ingestion/   ingest_documents.py — PDF/TXT → chunk → embed → Pinecone
 db/          schema.sql + seed.py (stubbed CRM data)
 app/         streamlit_app.py (legacy local chat UI)
